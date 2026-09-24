@@ -1,3 +1,28 @@
+steps:
+      - uses: actions/checkout@v4
+
+      # 1. Installer Node.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 2. AJOUTER CECI : Installer pnpm
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      # 3. Installer les dépendances JS avec pnpm
+      - name: Install dependencies
+        run: pnpm install
+
+      # 4. Compiler l'application avec Tauri
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: main
+          releaseName: "ProFast Facture main"
+          # ... le reste de votre config tauri-action
 name: Build ProFast Facture (Windows .exe)
 
 # Déclenchement : à chaque tag "v*" (ex: v0.1.0) ou manuellement depuis l'onglet Actions.
