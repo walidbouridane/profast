@@ -1,40 +1,17 @@
-steps:
-      - uses: actions/checkout@v4
-
-      # 1. Installer Node.js
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # 2. AJOUTER CECI : Installer pnpm
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      # 3. Installer les dépendances JS avec pnpm
-      - name: Install dependencies
-        run: pnpm install
-
-      # 4. Compiler l'application avec Tauri
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: main
-          releaseName: "ProFast Facture main"
-          # ... le reste de votre config tauri-action
 name: Build ProFast Facture (Windows .exe)
 
-# Déclenchement : à chaque tag "v*" (ex: v0.1.0) ou manuellement depuis l'onglet Actions.
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
 
 jobs:
   build-windows:
-    runs-on: windows-latest   # <-- essentiel : Tauri + WebView2 doivent être compilés SUR Windows
+    runs-on: windows-latest
+
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -44,11 +21,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Installer pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - name: Installer Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
       - name: Installer les dépendances frontend
-        run: npm install --legacy-peer-deps
+        run: pnpm install
 
       - name: Compiler l'application (.exe + installeur NSIS)
         uses: tauri-apps/tauri-action@v0
@@ -59,16 +41,3 @@ jobs:
           releaseName: "ProFast Facture ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
-
-      # Si tu préfères juste récupérer le .exe sans créer de Release GitHub,
-      # remplace le step ci-dessus par ceci :
-      #
-      # - name: Build Tauri
-      #   run: |
-      #     npm run build
-      #     npx tauri build
-      # - name: Uploader l'exécutable
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: profast-facture-windows
-      #     path: src-tauri/target/release/bundle/nsis/*.exe
