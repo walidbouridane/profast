@@ -71,7 +71,7 @@ pub async fn upsert_products(
     session: State<Session>,
     rows: Vec<ProductRow>,
 ) -> Result<Vec<crate::db::ProductLite>, String> {
-    let user_id = require(&session, &["ADMIN"]?;
+    let user_id = require(&session, &["ADMIN"])?;
     db.upsert_products(user_id, rows).await
 }
 
@@ -83,7 +83,7 @@ pub async fn create_client(
     nif: String,
     phone: String,
 ) -> Result<crate::db::ClientLite, String> {
-    let user_id = require(&session, &["ADMIN", "COMMERCIAL"]?;
+    let user_id = require(&session, &["ADMIN", "COMMERCIAL"])?;
     db.create_client(user_id, &name, &nif, &phone).await
 }
 
@@ -102,7 +102,7 @@ pub async fn save_invoice(
     session: State<Session>,
     doc: NewInvoice,
 ) -> Result<SavedInvoice, String> {
-    let user_id = require(&session, &["ADMIN", "COMMERCIAL"]?;
+    let user_id = require(&session, &["ADMIN", "COMMERCIAL"])?;
     db.save_invoice(user_id, &doc).await
 }
 
@@ -116,7 +116,7 @@ pub async fn record_payment(
     date: String,
     ref_number: Option<String>,
 ) -> Result<(), String> {
-    let user_id = require(&session, &["ADMIN", "COMMERCIAL"]?;
+    let user_id = require(&session, &["ADMIN", "COMMERCIAL"])?;
     if !matches!(method.as_str(), "CASH" | "CHECK" | "TRANSFER" | "CREDIT") || amount <= 0.0 {
         return Err("paiement invalide".into());
     }
@@ -183,7 +183,7 @@ pub async fn g50_report(
     year: i32,
     month: u32,
 ) -> Result<crate::db::G50Raw, String> {
-    require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "ACCOUNTANT"])?;
     let (start, end) = period_range(&period_type, year, month)?;
     db.g50_raw(&start, &end).await
 }
@@ -197,7 +197,7 @@ pub async fn g50_save_snapshot(
     month: u32,
     data_json: String,
 ) -> Result<(), String> {
-    let user_id = require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    let user_id = require(&session, &["ADMIN", "ACCOUNTANT"])?;
     let (start, end) = period_range(&period_type, year, month)?;
     db.save_g50_snapshot(user_id, &period_type, &start, &end, &data_json).await
 }
@@ -208,13 +208,13 @@ pub async fn g50_save_snapshot(
 
 #[tauri::command]
 pub async fn stock_overview(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::StockRow>, String> {
-    require(&session, &["ADMIN", "STOREKEEPER"]?;
+    require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.stock_overview().await
 }
 
 #[tauri::command]
 pub async fn stock_movements(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::MovementRow>, String> {
-    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.stock_movements(50).await
 }
 
@@ -227,7 +227,7 @@ pub async fn stock_move(
     rtype: String,
     note: Option<String>,
 ) -> Result<(), String> {
-    let user_id = require(&session, &["ADMIN", "STOREKEEPER"]?;
+    let user_id = require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.stock_move(user_id, product_id, delta, &rtype, note.as_deref()).await
 }
 
@@ -240,7 +240,7 @@ pub async fn transfer_stock(
     to_warehouse: i64,
     qty: f64,
 ) -> Result<(), String> {
-    let user_id = require(&session, &["ADMIN", "STOREKEEPER"]?;
+    let user_id = require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.transfer_stock(user_id, product_id, from_warehouse, to_warehouse, qty).await
 }
 
@@ -250,19 +250,19 @@ pub async fn transfer_stock(
 
 #[tauri::command]
 pub async fn suppliers_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::SupplierLite>, String> {
-    require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.suppliers_list().await
 }
 
 #[tauri::command]
 pub async fn create_supplier(db: State<Db>, session: State<Session>, name: String, nif: String) -> Result<crate::db::SupplierLite, String> {
-    let _user = require(&session, &["ADMIN"]?;
+    let _user = require(&session, &["ADMIN"])?;
     db.create_supplier(&name, if nif.is_empty() { None } else { Some(nif.as_str()) }).await
 }
 
 #[tauri::command]
 pub async fn fx_recent(db: State<Db>, session: State<Session>, currency: String) -> Result<Vec<crate::db::FxRow>, String> {
-    require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.fx_recent(&currency.to_uppercase()).await
 }
 
@@ -276,7 +276,7 @@ pub async fn record_fx_rate(
     parallel_rate: Option<f64>,
     source: String,
 ) -> Result<(), String> {
-    let _user = require(&session, &["ADMIN"]?;
+    let _user = require(&session, &["ADMIN"])?;
     db.record_fx_rate(&date, &currency.to_uppercase(), official_rate, parallel_rate, &source).await
 }
 
@@ -286,7 +286,7 @@ pub async fn record_purchase(
     session: State<Session>,
     purchase: crate::db::PurchaseInput,
 ) -> Result<crate::db::PurchaseRow, String> {
-    let user_id = require(&session, &["ADMIN"]?;
+    let user_id = require(&session, &["ADMIN"])?;
     db.record_purchase(user_id, &purchase).await
 }
 
@@ -297,7 +297,7 @@ pub async fn purchases_list(
     start: String,
     end: String,
 ) -> Result<Vec<crate::db::PurchaseRow>, String> {
-    require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.purchases_list(&start, &end).await
 }
 
@@ -307,19 +307,19 @@ pub async fn purchases_list(
 
 #[tauri::command]
 pub async fn inventory_start(db: State<Db>, session: State<Session>, warehouse_id: i64) -> Result<crate::db::InventoryInfo, String> {
-    let user_id = require(&session, &["ADMIN", "STOREKEEPER"]?;
+    let user_id = require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.inventory_start(user_id, warehouse_id).await
 }
 
 #[tauri::command]
 pub async fn inventory_get(db: State<Db>, session: State<Session>, id: i64) -> Result<crate::db::InventoryInfo, String> {
-    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.inventory_get(id).await
 }
 
 #[tauri::command]
 pub async fn inventories_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::InventorySummary>, String> {
-    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.inventories_list(20).await
 }
 
@@ -330,7 +330,7 @@ pub async fn inventory_validate(
     id: i64,
     counts: Vec<crate::db::CountedLine>,
 ) -> Result<crate::db::InventoryResult, String> {
-    let user_id = require(&session, &["ADMIN", "STOREKEEPER"]?;
+    let user_id = require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.inventory_validate(user_id, id, counts).await
 }
 
@@ -340,7 +340,7 @@ pub async fn inventory_validate(
 
 #[tauri::command]
 pub async fn users_admin_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::AdminUser>, String> {
-    require(&session, &["ADMIN"]?;
+    require(&session, &["ADMIN"])?;
     db.admin_users().await
 }
 
@@ -354,19 +354,19 @@ pub async fn user_create(
     pin: String,
     can_edit_prices: bool,
 ) -> Result<crate::db::AdminUser, String> {
-    let actor = require(&session, &["ADMIN"]?;
+    let actor = require(&session, &["ADMIN"])?;
     db.create_user(actor, &username, &full_name, &role, &pin, can_edit_prices).await
 }
 
 #[tauri::command]
 pub async fn user_set_active(db: State<Db>, session: State<Session>, id: i64, active: bool) -> Result<(), String> {
-    let actor = require(&session, &["ADMIN"]?;
+    let actor = require(&session, &["ADMIN"])?;
     db.set_user_active(actor, id, active).await
 }
 
 #[tauri::command]
 pub async fn user_set_price_rights(db: State<Db>, session: State<Session>, id: i64, can: bool) -> Result<(), String> {
-    let actor = require(&session, &["ADMIN"]?;
+    let actor = require(&session, &["ADMIN"])?;
     db.set_user_price_rights(actor, id, can).await
 }
 
@@ -444,7 +444,7 @@ pub async fn warehouses_list(db: State<Db>) -> Result<Vec<WarehouseLite>, String
 
 #[tauri::command]
 pub async fn dashboard_data(db: State<Db>, session: State<Session>) -> Result<crate::db::Dashboard, String> {
-    require(&session, &["ADMIN", "ACCOUNTANT"]?;
+    require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.dashboard().await
 }
 
