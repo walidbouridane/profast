@@ -9,10 +9,12 @@
 use crate::auth;
 use crate::fiscal;
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
-use sqlx::{Row, SqliteRow};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteRow};
+use sqlx::Row;
+use chrono::Datelike;
 use std::ops::Deref;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::Duration;
 
 pub struct Db {
@@ -644,7 +646,7 @@ impl Db {
                 "UPDATE users SET failed_attempts = ?1, locked_until = ?2 WHERE id = ?3",
             )
             .bind(attempts)
-            .bind(lock)
+            .bind(lock.clone())
             .bind(id)
             .execute(&self.pool)
             .await
@@ -2172,7 +2174,7 @@ impl Db {
 
     async fn audit_tx(
         &self,
-        tx: &mut sqlx::SqliteTransaction,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
         user_id: i64,
         action: &str,
         entity: &str,

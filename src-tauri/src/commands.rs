@@ -8,7 +8,7 @@
 //! ============================================================================
 
 use crate::db::{Db, NewInvoice, ProductRow, SavedInvoice};
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use serde::Serialize;
 use sqlx::Row;
 use tauri::State;
@@ -21,19 +21,19 @@ pub struct Session {
 }
 
 #[tauri::command]
-pub async fn set_session(state: tauri::State<Session>, user_id: i64, role: String) -> Result<(), String> {
+pub async fn set_session(state: tauri::State<'_, Session>, user_id: i64, role: String) -> Result<(), String> {
     *state.inner() = Session { user_id, role };
     Ok(())
 }
 
 /// Rôle courant (le webview l'utilise pour masquer UI + double-check serveur).
 #[tauri::command]
-pub fn session_role(state: tauri::State<Session>) -> Option<String> {
+pub fn session_role(state: tauri::State<'_, Session>) -> Option<String> {
     (!state.role.is_empty()).then(|| state.role.clone())
 }
 
-fn require(state: &tauri::State<Session>, roles: &[&str]) -> Result<i64, String> {
-    if roles.contains(state.role.as_str()) {
+fn require(state: &tauri::State<'_, Session>, roles: &[&str]) -> Result<i64, String> {
+    if roles.contains(&state.role.as_str()) {
         Ok(state.user_id)
     } else {
         Err(format!("Accès refusé (rôle {:?})", state.role))
@@ -45,7 +45,7 @@ fn require(state: &tauri::State<Session>, roles: &[&str]) -> Result<i64, String>
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn preload_catalog(db: State<Db>, session: State<Session>) -> Result<crate::db::PreloadData, String> {
+pub async fn preload_catalog(db: State<'_, Db>, session: State<'_, Session>) -> Result<crate::db::PreloadData, String> {
     let data = db.preload().await?;
     // Masquage SÉCURISÉ : les coûts ne quittent jamais le main-process pour
     // les rôles sans droit (COMMERCIAL/STOREKEEPER/ACCOUNTANT n'a pas besoin
@@ -67,8 +67,8 @@ pub async fn preload_catalog(db: State<Db>, session: State<Session>) -> Result<c
 
 #[tauri::command]
 pub async fn upsert_products(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     rows: Vec<ProductRow>,
 ) -> Result<Vec<crate::db::ProductLite>, String> {
     let user_id = require(&session, &["ADMIN"])?;
@@ -77,8 +77,8 @@ pub async fn upsert_products(
 
 #[tauri::command]
 pub async fn create_client(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     name: String,
     nif: String,
     phone: String,
@@ -92,14 +92,14 @@ pub async fn create_client(
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn next_number(db: State<Db>, doc_type: String) -> Result<String, String> {
+pub async fn next_number(db: State<'_, Db>, doc_type: String) -> Result<String, String> {
     db.next_number_preview(&doc_type.to_uppercase()).await
 }
 
 #[tauri::command]
 pub async fn save_invoice(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     doc: NewInvoice,
 ) -> Result<SavedInvoice, String> {
     let user_id = require(&session, &["ADMIN", "COMMERCIAL"])?;
@@ -108,8 +108,8 @@ pub async fn save_invoice(
 
 #[tauri::command]
 pub async fn record_payment(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     invoice_id: i64,
     amount: f64,
     method: String,
@@ -149,12 +149,11 @@ pub async fn record_payment(
 
 fn period_range(period_type: &str, year: i32, month: u32) -> Result<(String, String), String> {
     let pad = |n: u32| format!("{n:02}");
-    let last_day = |y: i32, m: u32| -> u32 {
-        let d = chrono::NaiveDate::from_ymd_opt(y, m + 1, 1)
+    let last_day = |y: i32, m: u32| -> Result<u32, String> {
+        chrono::NaiveDate::from_ymd_opt(y, m + 1, 1)
             .and_then(|d| d.pred_opt())
             .map(|d| d.day())
-            .ok_or_else(|| "mois invalide".to_string())?;
-        Ok(d)
+            .ok_or_else(|| "mois invalide".to_string())
     };
     match period_type {
         "MONTH" => {
@@ -177,8 +176,8 @@ fn period_range(period_type: &str, year: i32, month: u32) -> Result<(String, Str
 
 #[tauri::command]
 pub async fn g50_report(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     period_type: String,
     year: i32,
     month: u32,
@@ -190,8 +189,8 @@ pub async fn g50_report(
 
 #[tauri::command]
 pub async fn g50_save_snapshot(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     period_type: String,
     year: i32,
     month: u32,
@@ -207,21 +206,21 @@ pub async fn g50_save_snapshot(
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn stock_overview(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::StockRow>, String> {
+pub async fn stock_overview(db: State<'_, Db>, session: State<'_, Session>) -> Result<Vec<crate::db::StockRow>, String> {
     require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.stock_overview().await
 }
 
 #[tauri::command]
-pub async fn stock_movements(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::MovementRow>, String> {
+pub async fn stock_movements(db: State<'_, Db>, session: State<'_, Session>) -> Result<Vec<crate::db::MovementRow>, String> {
     require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.stock_movements(50).await
 }
 
 #[tauri::command]
 pub async fn stock_move(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     product_id: i64,
     delta: f64,
     rtype: String,
@@ -233,8 +232,8 @@ pub async fn stock_move(
 
 #[tauri::command]
 pub async fn transfer_stock(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     product_id: i64,
     from_warehouse: i64,
     to_warehouse: i64,
@@ -249,27 +248,27 @@ pub async fn transfer_stock(
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn suppliers_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::SupplierLite>, String> {
+pub async fn suppliers_list(db: State<'_, Db>, session: State<'_, Session>) -> Result<Vec<crate::db::SupplierLite>, String> {
     require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.suppliers_list().await
 }
 
 #[tauri::command]
-pub async fn create_supplier(db: State<Db>, session: State<Session>, name: String, nif: String) -> Result<crate::db::SupplierLite, String> {
+pub async fn create_supplier(db: State<'_, Db>, session: State<'_, Session>, name: String, nif: String) -> Result<crate::db::SupplierLite, String> {
     let _user = require(&session, &["ADMIN"])?;
     db.create_supplier(&name, if nif.is_empty() { None } else { Some(nif.as_str()) }).await
 }
 
 #[tauri::command]
-pub async fn fx_recent(db: State<Db>, session: State<Session>, currency: String) -> Result<Vec<crate::db::FxRow>, String> {
+pub async fn fx_recent(db: State<'_, Db>, session: State<'_, Session>, currency: String) -> Result<Vec<crate::db::FxRow>, String> {
     require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.fx_recent(&currency.to_uppercase()).await
 }
 
 #[tauri::command]
 pub async fn record_fx_rate(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     date: String,
     currency: String,
     official_rate: f64,
@@ -282,8 +281,8 @@ pub async fn record_fx_rate(
 
 #[tauri::command]
 pub async fn record_purchase(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     purchase: crate::db::PurchaseInput,
 ) -> Result<crate::db::PurchaseRow, String> {
     let user_id = require(&session, &["ADMIN"])?;
@@ -292,8 +291,8 @@ pub async fn record_purchase(
 
 #[tauri::command]
 pub async fn purchases_list(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     start: String,
     end: String,
 ) -> Result<Vec<crate::db::PurchaseRow>, String> {
@@ -306,27 +305,27 @@ pub async fn purchases_list(
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn inventory_start(db: State<Db>, session: State<Session>, warehouse_id: i64) -> Result<crate::db::InventoryInfo, String> {
+pub async fn inventory_start(db: State<'_, Db>, session: State<'_, Session>, warehouse_id: i64) -> Result<crate::db::InventoryInfo, String> {
     let user_id = require(&session, &["ADMIN", "STOREKEEPER"])?;
     db.inventory_start(user_id, warehouse_id).await
 }
 
 #[tauri::command]
-pub async fn inventory_get(db: State<Db>, session: State<Session>, id: i64) -> Result<crate::db::InventoryInfo, String> {
+pub async fn inventory_get(db: State<'_, Db>, session: State<'_, Session>, id: i64) -> Result<crate::db::InventoryInfo, String> {
     require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.inventory_get(id).await
 }
 
 #[tauri::command]
-pub async fn inventories_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::InventorySummary>, String> {
+pub async fn inventories_list(db: State<'_, Db>, session: State<'_, Session>) -> Result<Vec<crate::db::InventorySummary>, String> {
     require(&session, &["ADMIN", "STOREKEEPER", "ACCOUNTANT"])?;
     db.inventories_list(20).await
 }
 
 #[tauri::command]
 pub async fn inventory_validate(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     id: i64,
     counts: Vec<crate::db::CountedLine>,
 ) -> Result<crate::db::InventoryResult, String> {
@@ -339,15 +338,15 @@ pub async fn inventory_validate(
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn users_admin_list(db: State<Db>, session: State<Session>) -> Result<Vec<crate::db::AdminUser>, String> {
+pub async fn users_admin_list(db: State<'_, Db>, session: State<'_, Session>) -> Result<Vec<crate::db::AdminUser>, String> {
     require(&session, &["ADMIN"])?;
     db.admin_users().await
 }
 
 #[tauri::command]
 pub async fn user_create(
-    db: State<Db>,
-    session: State<Session>,
+    db: State<'_, Db>,
+    session: State<'_, Session>,
     username: String,
     full_name: String,
     role: String,
@@ -359,19 +358,19 @@ pub async fn user_create(
 }
 
 #[tauri::command]
-pub async fn user_set_active(db: State<Db>, session: State<Session>, id: i64, active: bool) -> Result<(), String> {
+pub async fn user_set_active(db: State<'_, Db>, session: State<'_, Session>, id: i64, active: bool) -> Result<(), String> {
     let actor = require(&session, &["ADMIN"])?;
     db.set_user_active(actor, id, active).await
 }
 
 #[tauri::command]
-pub async fn user_set_price_rights(db: State<Db>, session: State<Session>, id: i64, can: bool) -> Result<(), String> {
+pub async fn user_set_price_rights(db: State<'_, Db>, session: State<'_, Session>, id: i64, can: bool) -> Result<(), String> {
     let actor = require(&session, &["ADMIN"])?;
     db.set_user_price_rights(actor, id, can).await
 }
 
 #[tauri::command]
-pub async fn change_pin(db: State<Db>, session: State<Session>, old_pin: String, new_pin: String) -> Result<(), String> {
+pub async fn change_pin(db: State<'_, Db>, session: State<'_, Session>, old_pin: String, new_pin: String) -> Result<(), String> {
     // Chaque utilisateur connecté peut changer SON PIN.
     if session.role.is_empty() {
         return Err("non connecté".into());
@@ -422,7 +421,7 @@ pub struct WarehouseLite {
 }
 
 #[tauri::command]
-pub async fn warehouses_list(db: State<Db>) -> Result<Vec<WarehouseLite>, String> {
+pub async fn warehouses_list(db: State<'_, Db>) -> Result<Vec<WarehouseLite>, String> {
     let rows = sqlx::query("SELECT id, code, name, is_default FROM warehouses ORDER BY id")
         .fetch_all(&*db)
         .await
@@ -443,7 +442,7 @@ pub async fn warehouses_list(db: State<Db>) -> Result<Vec<WarehouseLite>, String
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn dashboard_data(db: State<Db>, session: State<Session>) -> Result<crate::db::Dashboard, String> {
+pub async fn dashboard_data(db: State<'_, Db>, session: State<'_, Session>) -> Result<crate::db::Dashboard, String> {
     require(&session, &["ADMIN", "ACCOUNTANT"])?;
     db.dashboard().await
 }

@@ -101,8 +101,8 @@ pub fn run() {
 
 #[tauri::command]
 pub async fn auth_commands_login(
-    db: tauri::State<Db>,
-    session_state: tauri::State<Session>,
+    db: tauri::State<'_, Db>,
+    session_state: tauri::State<'_, Session>,
     username: String,
     pin: String,
 ) -> Result<db::UserSession, String> {
@@ -116,7 +116,7 @@ pub async fn auth_commands_login(
 
 #[tauri::command]
 pub async fn auth_commands_setup_admin(
-    db: tauri::State<Db>,
+    db: tauri::State<'_, Db>,
     username: String,
     full_name: String,
     pin: String,
@@ -135,6 +135,6 @@ pub async fn auth_commands_setup_admin(
 }
 
 #[tauri::command]
-pub async fn auth_needs_setup(db: tauri::State<Db>) -> Result<bool, String> {
+pub async fn auth_needs_setup(db: tauri::State<'_, Db>) -> Result<bool, String> {
     db.needs_setup().await
 }

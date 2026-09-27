@@ -22,7 +22,7 @@ fn status_inactive(hwid: &str, demo_remaining: u32, error: impl Into<String>) ->
 
 /// Fenêtre de vérification au démarrage.
 #[tauri::command]
-pub async fn license_status(db: State<Db>) -> LicenseStatus {
+pub async fn license_status(db: State<'_, Db>) -> LicenseStatus {
     let now = Utc::now().timestamp();
     let hwid = crate::license::hwid::compute_hwid();
     match db.current_license_key().await {
@@ -58,7 +58,7 @@ pub async fn license_status(db: State<Db>) -> LicenseStatus {
 
 /// Activation : vérifie la clé (HWID + signature + dates) PUIS persiste.
 #[tauri::command]
-pub async fn activate_license(db: State<Db>, key: String) -> Result<LicenseStatus, String> {
+pub async fn activate_license(db: State<'_, Db>, key: String) -> Result<LicenseStatus, String> {
     let key = key.trim().to_string();
     let hwid = crate::license::hwid::compute_hwid();
     let now = Utc::now().timestamp();
@@ -83,7 +83,7 @@ pub async fn activate_license(db: State<Db>, key: String) -> Result<LicenseStatu
 
 /// Garde-fou : autorise-t-on la CRÉATION d'une facture ?
 #[tauri::command]
-pub async fn can_create_invoice(db: State<Db>) -> Result<CanCreate, String> {
+pub async fn can_create_invoice(db: State<'_, Db>) -> Result<CanCreate, String> {
     let status = license_status(db).await;
     if status.active {
         return Ok(CanCreate { ok: true, remaining: u32::MAX });
@@ -94,7 +94,7 @@ pub async fn can_create_invoice(db: State<Db>) -> Result<CanCreate, String> {
 
 /// Incrémente le compteur Démo après enregistrement réussi d'une facture.
 #[tauri::command]
-pub async fn consume_demo_invoice(db: State<Db>) -> Result<(), String> {
+pub async fn consume_demo_invoice(db: State<'_, Db>) -> Result<(), String> {
     db.bump_demo_used().await
 }
 

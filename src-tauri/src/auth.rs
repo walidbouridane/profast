@@ -17,7 +17,7 @@ fn argon2() -> Argon2<'static> {
     Argon2::new(
         Algorithm::Argon2id,
         Version::V0x13,
-        Params::new(65536, 3, 4).expect("paramètres argon2 valides"),
+        Params::new(65536, 3, 4, None).expect("paramètres argon2 valides"),
     )
 }
 
