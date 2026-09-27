@@ -39,6 +39,52 @@ pub fn verify_pin(pin: &str, username: &str, hash: &str) -> bool {
     argon2().verify_password(input.as_bytes(), &parsed).is_ok()
 }
 
+// ----------------------------------------------------------------------------
+// Auth (PIN) — commandes Tauri
+// (déplacées ici depuis lib.rs : les commandes définies directement à la
+//  racine du crate provoquaient un conflit de macro __cmd__ avec Tauri)
+// ----------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn auth_commands_login(
+    db: tauri::State<'_, crate::db::Db>,
+    session_state: tauri::State<'_, std::sync::Mutex<crate::commands::Session>>,
+    username: String,
+    pin: String,
+) -> Result<crate::db::UserSession, String> {
+    let session = db.login(&username, &pin).await?;
+    *session_state.lock().unwrap() = crate::commands::Session {
+        user_id: session.id,
+        role: session.role.clone(),
+    };
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn auth_commands_setup_admin(
+    db: tauri::State<'_, crate::db::Db>,
+    username: String,
+    full_name: String,
+    pin: String,
+) -> Result<(), String> {
+    if !db.needs_setup().await? {
+        return Err("un administrateur existe déjà".into());
+    }
+    let username = username.trim().to_string();
+    if username.len() < 3 {
+        return Err("nom d'utilisateur trop court (3 caractères min)".into());
+    }
+    if pin.len() < 4 {
+        return Err("PIN trop court (4 caractères minimum)".into());
+    }
+    db.setup_admin(&username, &full_name, &pin).await
+}
+
+#[tauri::command]
+pub async fn auth_needs_setup(db: tauri::State<'_, crate::db::Db>) -> Result<bool, String> {
+    db.needs_setup().await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

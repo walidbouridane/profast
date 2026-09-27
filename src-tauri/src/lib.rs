@@ -10,6 +10,7 @@ mod pdf;
 
 use commands::Session;
 use db::Db;
+use std::sync::Mutex;
 use tauri::Manager;
 
 const SCHEMA: &str = include_str!("../../db/schema.sql");
@@ -17,7 +18,7 @@ const SCHEMA: &str = include_str!("../../db/schema.sql");
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(Session::default())
+        .manage(Mutex::new(Session::default()))
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
@@ -45,9 +46,9 @@ pub fn run() {
             commands::set_session,
             commands::session_role,
             // auth PIN
-            auth_commands_login,
-            auth_commands_setup_admin,
-            auth_needs_setup,
+            auth::auth_commands_login,
+            auth::auth_commands_setup_admin,
+            auth::auth_needs_setup,
             // fichiers locaux (PDF / images)
             commands::read_local_image,
             commands::pdf_out_dir,
@@ -95,46 +96,3 @@ pub fn run() {
         .expect("erreur fatale Tauri");
 }
 
-// ----------------------------------------------------------------------------
-// Auth (PIN) — commandes
-// ----------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn auth_commands_login(
-    db: tauri::State<'_, Db>,
-    session_state: tauri::State<'_, Session>,
-    username: String,
-    pin: String,
-) -> Result<db::UserSession, String> {
-    let session = db.login(&username, &pin).await?;
-    *session_state.inner() = Session {
-        user_id: session.id,
-        role: session.role.clone(),
-    };
-    Ok(session)
-}
-
-#[tauri::command]
-pub async fn auth_commands_setup_admin(
-    db: tauri::State<'_, Db>,
-    username: String,
-    full_name: String,
-    pin: String,
-) -> Result<(), String> {
-    if !db.needs_setup().await? {
-        return Err("un administrateur existe déjà".into());
-    }
-    let username = username.trim().to_string();
-    if username.len() < 3 {
-        return Err("nom d'utilisateur trop court (3 caractères min)".into());
-    }
-    if pin.len() < 4 {
-        return Err("PIN trop court (4 caractères minimum)".into());
-    }
-    db.setup_admin(&username, &full_name, &pin).await
-}
-
-#[tauri::command]
-pub async fn auth_needs_setup(db: tauri::State<'_, Db>) -> Result<bool, String> {
-    db.needs_setup().await
-}

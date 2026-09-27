@@ -22,10 +22,10 @@ fn status_inactive(hwid: &str, demo_remaining: u32, error: impl Into<String>) ->
 
 /// Fenêtre de vérification au démarrage.
 #[tauri::command]
-pub async fn license_status(db: State<'_, Db>) -> LicenseStatus {
+pub async fn license_status(db: State<'_, Db>) -> Result<LicenseStatus, String> {
     let now = Utc::now().timestamp();
     let hwid = crate::license::hwid::compute_hwid();
-    match db.current_license_key().await {
+    let status = match db.current_license_key().await {
         Ok(Some(key)) => match verify::verify_license(&key, &hwid, now) {
             Ok(lic) => {
                 let _ = db.mark_verified().await;
@@ -53,7 +53,8 @@ pub async fn license_status(db: State<'_, Db>) -> LicenseStatus {
             status_inactive(&hwid, demo, "Aucune clé d'activation — mode Démo (10 factures)")
         }
         Err(e) => status_inactive(&hwid, 0, e),
-    }
+    };
+    Ok(status)
 }
 
 /// Activation : vérifie la clé (HWID + signature + dates) PUIS persiste.
@@ -78,13 +79,13 @@ pub async fn activate_license(db: State<'_, Db>, key: String) -> Result<LicenseS
     )
     .await?;
 
-    Ok(license_status(db).await)
+    license_status(db).await
 }
 
 /// Garde-fou : autorise-t-on la CRÉATION d'une facture ?
 #[tauri::command]
 pub async fn can_create_invoice(db: State<'_, Db>) -> Result<CanCreate, String> {
-    let status = license_status(db).await;
+    let status = license_status(db).await?;
     if status.active {
         return Ok(CanCreate { ok: true, remaining: u32::MAX });
     }

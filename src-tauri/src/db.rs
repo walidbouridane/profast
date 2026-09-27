@@ -31,6 +31,7 @@ impl Deref for Db {
 impl Db {
     pub async fn open(path: &Path, schema: &str) -> Result<Self, String> {
         let opts = SqliteConnectOptions::from_str(&format!("sqlite:{}", path.display()))
+            .map_err(|e| format!("options de connexion invalides : {e}"))?
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Wal)
             .foreign_keys(true)
@@ -817,7 +818,7 @@ impl Db {
             .bind(r.tva_rate)
             .bind(r.min_stock)
             .bind(user_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
         }
@@ -1046,7 +1047,7 @@ impl Db {
             .bind(c.amount_tva)
             .bind(c.amount_ttc)
             .bind(costs[i])
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
         }
@@ -1064,7 +1065,7 @@ impl Db {
                         )
                         .bind(it.qty)
                         .bind(pid)
-                        .execute(&mut *tx)
+                        .execute(&mut **tx)
                         .await
                         .map_err(|e| e.to_string())?;
                         sqlx::query(
@@ -1079,7 +1080,7 @@ impl Db {
                         .bind(&doc_type)
                         .bind(&number)
                         .bind(user_id)
-                        .execute(&mut *tx)
+                        .execute(&mut **tx)
                         .await
                         .map_err(|e| e.to_string())?;
                     }
@@ -1285,7 +1286,7 @@ impl Db {
         )
         .bind(product_id)
         .bind(delta)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         sqlx::query(
@@ -1297,7 +1298,7 @@ impl Db {
         .bind(delta)
         .bind(note)
         .bind(user_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         let ref_id = product_id.to_string();
@@ -1344,7 +1345,7 @@ impl Db {
         .bind(qty)
         .bind(product_id)
         .bind(from_warehouse)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         sqlx::query(
@@ -1357,7 +1358,7 @@ impl Db {
         .bind(product_id)
         .bind(to_warehouse)
         .bind(qty)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -1370,7 +1371,7 @@ impl Db {
         .bind(qty)
         .bind(format!("{from_warehouse}->{to_warehouse}"))
         .bind(user_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         sqlx::query(
@@ -1382,7 +1383,7 @@ impl Db {
         .bind(qty)
         .bind(format!("{from_warehouse}->{to_warehouse}"))
         .bind(user_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -1587,7 +1588,7 @@ impl Db {
             .bind(p.extra_costs_dzd)
             .bind(landed_unit)
             .bind(pid)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -1600,7 +1601,7 @@ impl Db {
             )
             .bind(pid)
             .bind(p.qty)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
             sqlx::query(
@@ -1612,7 +1613,7 @@ impl Db {
             .bind(landed_unit)
             .bind(&p.doc_number)
             .bind(user_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
         }
@@ -1830,7 +1831,7 @@ impl Db {
             .bind(cl.counted)
             .bind(id)
             .bind(cl.product_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
         }
@@ -1843,7 +1844,7 @@ impl Db {
             .bind(a.diff)
             .bind(a.product_id)
             .bind(wh)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
             sqlx::query(
@@ -1855,7 +1856,7 @@ impl Db {
             .bind(a.diff)
             .bind(id.to_string())
             .bind(user_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;
         }
@@ -1864,7 +1865,7 @@ impl Db {
                 validated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1"#,
         )
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         let ref_id = id.to_string();
@@ -2189,7 +2190,7 @@ impl Db {
         .bind(entity)
         .bind(entity_id)
         .bind(&hwid)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         Ok(())
