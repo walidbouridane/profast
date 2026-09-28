@@ -50,10 +50,8 @@ fn require(state: &tauri::State<'_, Mutex<Session>>, roles: &[&str]) -> Result<i
 #[tauri::command]
 pub async fn preload_catalog(db: State<'_, Db>, session: State<'_, Mutex<Session>>) -> Result<crate::db::PreloadData, String> {
     let data = db.preload().await?;
-    // Masquage SÉCURISÉ : les coûts ne quittent jamais le main-process pour
-    // les rôles sans droit (COMMERCIAL/STOREKEEPER/ACCOUNTANT n'a pas besoin
-    // du coût de revient pour vendre).
-    let can_see_cost = session.role == "ADMIN";
+    // CORRECTION : Verrouiller le Mutex pour accéder au rôle
+    let can_see_cost = session.lock().unwrap().role == "ADMIN";
     let products = if can_see_cost {
         data.products
     } else {
@@ -374,11 +372,13 @@ pub async fn user_set_price_rights(db: State<'_, Db>, session: State<'_, Mutex<S
 
 #[tauri::command]
 pub async fn change_pin(db: State<'_, Db>, session: State<'_, Mutex<Session>>, old_pin: String, new_pin: String) -> Result<(), String> {
-    // Chaque utilisateur connecté peut changer SON PIN.
-    if session.role.is_empty() {
+    // CORRECTION : Verrouiller le Mutex et stocker la garde dans une variable
+    let s = session.lock().unwrap();
+    
+    if s.role.is_empty() {
         return Err("non connecté".into());
     }
-    db.change_pin(session.user_id, &old_pin, &new_pin).await
+    db.change_pin(s.user_id, &old_pin, &new_pin).await
 }
 
 // ----------------------------------------------------------------------------
