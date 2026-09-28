@@ -48,10 +48,17 @@ fn require(state: &tauri::State<'_, Mutex<Session>>, roles: &[&str]) -> Result<i
 // ----------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn preload_catalog(db: State<'_, Db>, session: State<'_, Mutex<Session>>) -> Result<crate::db::PreloadData, String> {
+pub async fn preload_catalog(
+    db: State<'_, Db>,
+    session: State<'_, Mutex<Session>>,
+) -> Result<crate::db::PreloadData, String> {
+    let can_see_cost = {
+        let s = session.lock().unwrap();
+        s.role == "ADMIN"
+    };
+
     let data = db.preload().await?;
-    // CORRECTION : Verrouiller le Mutex pour accéder au rôle
-    let can_see_cost = session.lock().unwrap().role == "ADMIN";
+
     let products = if can_see_cost {
         data.products
     } else {
@@ -63,6 +70,7 @@ pub async fn preload_catalog(db: State<'_, Db>, session: State<'_, Mutex<Session
             })
             .collect()
     };
+
     Ok(crate::db::PreloadData { products, ..data })
 }
 
@@ -371,14 +379,24 @@ pub async fn user_set_price_rights(db: State<'_, Db>, session: State<'_, Mutex<S
 }
 
 #[tauri::command]
-pub async fn change_pin(db: State<'_, Db>, session: State<'_, Mutex<Session>>, old_pin: String, new_pin: String) -> Result<(), String> {
-    // CORRECTION : Verrouiller le Mutex et stocker la garde dans une variable
-    let s = session.lock().unwrap();
-    
-    if s.role.is_empty() {
+pub async fn change_pin(
+    db: State<'_, Db>,
+    session: State<'_, Mutex<Session>>,
+    old_pin: String,
+    new_pin: String,
+) -> Result<(), String> {
+    // Le verrou est pris et relâché immédiatement à la fin du bloc {}
+    let (user_id, role) = {
+        let s = session.lock().unwrap();
+        (s.user_id, s.role.clone())
+    };
+
+    if role.is_empty() {
         return Err("non connecté".into());
     }
-    db.change_pin(s.user_id, &old_pin, &new_pin).await
+
+    // Le verrou étant libéré, le .await peut être exécuté en toute sécurité
+    db.change_pin(user_id, &old_pin, &new_pin).await
 }
 
 // ----------------------------------------------------------------------------
