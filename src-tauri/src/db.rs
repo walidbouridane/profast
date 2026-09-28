@@ -2190,7 +2190,7 @@ impl Db {
         .bind(entity)
         .bind(entity_id)
         .bind(&hwid)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|e| e.to_string())?;
         Ok(())
